@@ -9,8 +9,16 @@ function Map(id) {
     //设置地图的中心点和缩放比例 初始化地图
     this.map.centerAndZoom("北京");
 
+    //禁用鼠标默认的双击事件
+    this.map.disableDoubleClickZoom();
+
     //更新用户位置信息
     this.updateUserLocation();
+
+    //起始点
+    this.beginPoint = null;
+
+    // this.useMouseChooseLocation();
 }
 
 //添加全景控件
@@ -88,6 +96,52 @@ Map.prototype.navigation = function (currentPosition,destinationPosition) {
 
     //开始搜索
     nav.search(currentPosition,destinationPosition);
+    
+    this.beginPoint = null;
+    this.map.clearOverlay();
+};
+
+Map.prototype.useMouseChooseLocation = function () {
+
+    //给地图 添加 双击的  监听事件
+    this.map.addEventListener("dblclick",function (event) {
+
+        //如果 有起始点 再点击的时候 就是开始导航
+        //如果没有起始点  点击的时候 就是给起始点赋值
+        this.beginPoint?this.navigation(this.beginPoint,event.point):this.beginPoint = event.point;
+        
+    }.bind(this));
+
+};
+
+//把经纬度 转换成 地址
+Map.prototype.toAddress = function (point) {
+    return new Promise(function (success) {
+        console.log("dizhi",point);
+        var coder = new BMap.Geocoder();
+        coder.getLocation(point,function (result) {
+            console.log(result);
+            success(result.addressComponents.street);
+        });
+    });
+};
+
+//给地图 添加  双击事件 监听用户选取的点
+Map.prototype.addEventListener = function (beginView,endView) {
+
+    var self = this;
+    this.map.addEventListener("dblclick",function (event) {
+
+        //如果有起始点  就设置  终点输入框的值
+        self.beginPoint?self.toAddress(event.point).then(function (street) {
+            endView.setAttribute("value",street);
+        }):self.toAddress(event.point).then(function (street) {
+            beginView.setAttribute("value",street);
+            self.beginPoint = street;
+        });
+    //    如果没有起始点  就设置 起始点输入框的值
+    });
+
 };
 
 //初始化应用程序的方法
@@ -103,9 +157,13 @@ function init() {
     var map = new Map("mapContainer");
     map.addPanorama();
 
+    map.addEventListener(beginView,endView);
+
     //当点击搜索按钮的时候  开始搜索
     searchButton.onclick = function () {
         map.navigation(beginView.value,endView.value);
+        beginView.setAttribute("value","");
+        endView.setAttribute("value","");
     };
 }
 
